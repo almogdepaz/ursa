@@ -25,7 +25,6 @@ pub fn setup(n: i32, k: i32, a: i32) -> (PublicKey, VerificationKey, Vec::<Share
     let mut rng = rand::thread_rng();
 
 
-
     let element = Element {
         modulus: rand::thread_rng(), //random value
         value: rand::thread_rng(), //random value
@@ -34,8 +33,18 @@ pub fn setup(n: i32, k: i32, a: i32) -> (PublicKey, VerificationKey, Vec::<Share
     //calc polynomial variables
     let polynomial = Polynomial::new(element, (threshold - 1) as usize)?;
 
-    //find value at x==0 (g1)
-    let g1 = polynomial.evaluate(&x)?;
+    //find value at x==0
+    let alpha = polynomial.evaluate(&x)?;
+
+    //compute g1
+    let g1 = g ^ alpha;
+
+    // PK = (G, g, g1, g2, h1).
+
+    //VK = (gf(1), . . . , gf(n)
+
+
+    //SKi = g^f(i)
 
 
     return (nil, nli, nil);
