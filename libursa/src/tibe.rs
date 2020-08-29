@@ -50,24 +50,27 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, VerificationKey, Vec::<ShareKey>) {
     //let h1 = PointG2::new().unwrap();
     //let mut rng = rand::thread_rng();
 
-    let a = Element {
+    let a = PolyElement {
         modulus: rand::thread_rng(), //random value
         value: rand::thread_rng(), //random value
     };
+
+    //use pol_to_field_elem()??
+    alpha = a.value;
 
     let g = G1::generator();
     let g2 = G2::generator();
     let h1 = G2::generator();
 
-    let g1 = g * a; // or g.scalar_mul_variable_time(&a); see documentation: https://lib.rs/crates/amcl_wrapper 2.Scalar multiplication
+    let g1 = g * alpha; // or g.scalar_mul_variable_time(&a); see documentation: https://lib.rs/crates/amcl_wrapper 2.Scalar multiplication
 
     //calc polynomial variables
     let polynomial = Polynomial::new(a, (k - 1) as usize)?;
 
     // we don't need to find, since we set it to be 'a'
-    // maybe we'd like to assert that indeed a=poly(a), though probably it is tested - so only temporarily
+    // maybe we'd like to assert that indeed a=poly(0), though probably it is tested - so only temporarily
     //find value at x==0
-    let alpha = polynomial.evaluate(&x)?;
+    let alpha2 = polynomial.evaluate(&x)?;
 
     //compute g1
     //let g1 = g ^ alpha;
@@ -77,7 +80,8 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, VerificationKey, Vec::<ShareKey>) {
     let mut pol_eval = Vec::with_capacity(n as usize);
     for x in 1..n {
         let y = polynomial.evaluate(x)?;
-        pol_eval.push(y)
+        let y_val = pol_to_field_elem(y);
+        pol_eval.push(y_val)
     }
 
     //compute master key shares
@@ -123,6 +127,14 @@ pub fn encrypt(pk: PublicKey, id: ID, m: String) -> String {}
 pub fn decrypt(pk: PublicKey, id: ID, d: String, c: String) -> String {}
 
 pub fn validateCt(pk: PublicKey, id: i32, c: String) -> bool {}
+
+
+//convert *numbers* from the shamir.rs representation {modulus:BigNumber,value:BigNumber}
+//to a field element {value:BigNum}
+//maybe should go through to_bytes() --> from_bytes()
+pub fn pol_to_field_elem(pol_elem: PolyElement) -> field_element {
+    return pol_elem.value;
+}
 
 
 
