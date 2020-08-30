@@ -1,4 +1,3 @@
-
 //implementation of the Threshold Identity-Based Encryption scheme presented in the paper
 //Chosen Ciphertext Secure Public Key Threshold Encryption Without Random Oracles
 //By Dan Boneh, Xavier Boyen, and Shai Halevi
@@ -21,8 +20,7 @@ use sharing::shamir::{Element, Polynomial};
 use signatures::bls::PrivateKey;
 
 //Do we need this or is it already part of amcl_wrapper (which the following is copied form)?
-use crate::constants::{
-    //BarrettRedc_k, BarrettRedc_u, BarrettRedc_v, BigNumBits, FieldElement_SIZE, NLEN,
+use crate::amcl_wrapper::constants::{
     CurveOrder
 };
 
@@ -75,7 +73,7 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
     let a = Element {
         modulus: p,
-        value: BigNumber::from_u32(rng.gen()).unwrap(), //convert to BigNumber
+        value: BigNumber::from_u32(alpha).unwrap(), //convert to BigNumber
     };
     let polynomial = Polynomial::new(&a, (k - 1) as usize).unwrap();
 
@@ -143,9 +141,7 @@ pub fn pol_to_field_elem(pol_elem: &Element) -> FieldElement {
     return FieldElement::from(pol_elem.value);
 }
 
-// pub??
-pub fn poly_eval(x: PolyElement) -> field_element {
-
+fn poly_eval(x: PolyElement) -> field_element {
     let elem = PolyElement {
         modulus: CurveOrder,
         value: x,
