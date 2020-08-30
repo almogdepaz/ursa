@@ -16,11 +16,11 @@ use bn::BigNumber;
 
 /// Represents an element in a finite field as [0, n)
 #[derive(Debug)]
-struct Element {
+pub struct Element {
     /// A prime number
-    modulus: BigNumber,
+    pub(crate) modulus: BigNumber,
     /// The current element value
-    value: BigNumber,
+    pub(crate) value: BigNumber,
 }
 
 impl Element {
