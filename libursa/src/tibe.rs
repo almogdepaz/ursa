@@ -1,24 +1,23 @@
-
 //implementation of the Threshold Identity-Based Encryption scheme presented in the paper
 //Chosen Ciphertext Secure Public Key Threshold Encryption Without Random Oracles
 //By Dan Boneh, Xavier Boyen, and Shai Halevi
 //https://crypto.stanford.edu/~dabo/pubs/papers/ibethresh.pdf
 
-use rand::Rng;
 
-use CryptoResult;
-use keys::{PrivateKey, PublicKey};
-use pair::{Pair, PointG1, PointG2};
-use sharing::shamir::Polynomial;
+use std::convert::TryFrom;
+
 use amcl_wrapper::{
-    constants::{GroupG1_SIZE, MODBYTES},
-    extension_field_gt::GT,
-    field_elem::FieldElement,
     group_elem::GroupElement,
     group_elem_g1::G1,
     group_elem_g2::G2,
-    types_g2::GroupG2_SIZE,
 };
+use amcl_wrapper::field_elem::FieldElement;
+use rand::Rng;
+use zeroize::Zeroize;
+
+use bn::BigNumber;
+use sharing::shamir::{Element, Polynomial};
+use signatures::bls::PrivateKey;
 
 pub struct ID(pub Vec<u8>);
 impl_bytearray!(ID);
@@ -26,114 +25,112 @@ impl_bytearray!(ID);
 pub struct VerificationKey(pub Vec<u8>);
 impl_bytearray!(VerificationKey);
 
-pub struct ShareKey(pub Vec<u8>);
-impl_bytearray!(ShareKey);
 
-pub struct PrivateKeyShare(pub Vec<u8>);
-impl_bytearray!(PrivateKeyShare);
+pub struct Share {
+    pub j: i32,
+    pub value: G2,
+}
+
+pub struct PublicKey {
+    g: G1,
+    g1: G1,
+    g2: G2,
+    h1: G2,
+}
+
 
 //setup initiate the public parameters used in the scheme
 //this implementation of the setup function assumes a single unique trusted party
 //that generates the entire system parameters, including the "master" secret key 'a'
 // n = #parties ; k = threshold
-pub fn setup(n: i32, k: i32) -> (PublicKey, VerificationKey, Vec::<ShareKey>) {
+pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
     //assert k<=n? both greater than 0?
     if n < k {
-        return Err(CryptoError::GeneralError(
-            "#parties cannot be less than the threshold".to_string(),
-        ));
+        panic!("bad input") //todo error handling
     }
 
-    //let g = PointG1::new().unwrap();
-    //let g2 = PointG2::new().unwrap();
-    //let h1 = PointG2::new().unwrap();
-    //let mut rng = rand::thread_rng();
-
-    let a = PolyElement {
-        modulus: rand::thread_rng(), //random value
-        value: rand::thread_rng(), //random value
-    };
-
-    //use pol_to_field_elem()??
-    alpha = a.value;
+    //random number generator
+    let mut rng = rand::thread_rng();
 
     let g = G1::generator();
     let g2 = G2::generator();
     let h1 = G2::generator();
+    let p = BigNumber::generate_prime(128).unwrap();
+    let alpha: u32 = rng.gen();
 
-    let g1 = g * alpha; // or g.scalar_mul_variable_time(&a); see documentation: https://lib.rs/crates/amcl_wrapper 2.Scalar multiplication
 
+    // compute  g1 = g * alpha;
+    let scalar = &FieldElement::from(alpha);
+    let g1 = g.scalar_mul_const_time(scalar);
     //calc polynomial variables
-    let polynomial = Polynomial::new(a, (k - 1) as usize)?;
+    //init with a as f(0)
 
-    // we don't need to find, since we set it to be 'a'
-    // maybe we'd like to assert that indeed a=poly(0), though probably it is tested - so only temporarily
-    //find value at x==0
-    let alpha2 = polynomial.evaluate(&x)?;
+    let a = Element {
+        modulus: p,
+        value: BigNumber::from_u32(rng.gen()).unwrap(), //convert to BigNumber
+    };
+    let polynomial = Polynomial::new(&a, (k - 1) as usize).unwrap();
 
-    //compute g1
-    //let g1 = g ^ alpha;
 
     //compute polynomial evaluations 1..n
     //don't know if we want this to be a map (x,pol(x))
     let mut pol_eval = Vec::with_capacity(n as usize);
     for x in 1..n {
-        let y = polynomial.evaluate(x)?;
-        let y_val = pol_to_field_elem(y);
-        pol_eval.push(y_val)
+        //todo figure out the correct style for using unwrap
+        let t = BigNumber::from_u32(rng.gen()).unwrap();
+        let y = polynomial.evaluate(t).unwrap();
+        pol_eval.push(y)
     }
 
-    //compute master key shares
-    let mut SK = Vec::with_capacity(n as usize);
+
+    //compute master key share
+
+    let mut sk = Vec::with_capacity(n as usize);
     for j in 1..n {
-    //for j in 0..n-1 {   ???
+        //for j in 0..n-1 {   ???
         //let identifier = j + 1;
-        let b = pol_eval[j];
-        let t = g2 * b;
-        SK.push(Share {
-            //identifier,
+        let b = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
+        sk.push(Share {
             j,
-            G2: t,
+            value: g2.clone().scalar_mul_const_time(&pol_to_field_elem(b)),
         });
     }
 
     //compute verification key
-    let mut VK = Vec::with_capacity(n as usize);
+    let mut vk = Vec::with_capacity(n as usize);
     for j in 1..n {
         //for j in 0..n-1 {   ???
-        let b = pol_eval[j];
-        let t = g * b;
-        VK.push(t);
+        let b = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
+        //todo need to test that the value exists
+        vk.push(g.clone().scalar_mul_const_time(&pol_to_field_elem(b)));
     }
 
-
-    PK = (g, g1, g2, h1);
-    //VK = (gf(1), . . . , gf(n)
-    //SKi = g^f(i)
-
-    return (PK, VK, SK);
+    let pk = PublicKey { g, g1, g2, h1 };
+    return (pk, vk, sk);
 }
 
 
-pub fn shareKeyGen(pk: PublicKey, i: i32, ski: ShareKey, id: ID) -> PrivateKeyShare {}
+pub fn shareKeyGen(pk: PublicKey, i: i32, ski: Share, id: ID) -> Share { return Share { j: 0, value: Default::default() }; }
 
-pub fn shareVerify(pk: PublicKey, vk: VerificationKey, id: ID, ti: PrivateKeyShare) -> bool {}
+pub fn shareVerify(pk: PublicKey, vk: VerificationKey, id: ID, ti: Share) -> bool { return true; }
 
-pub fn combine(pk: PublicKey, vk: String, id: ID, si: &[i32]) -> PrivateKey {}
+pub fn combine(pk: PublicKey, vk: String, id: ID, si: &[i32]) -> PrivateKey {
+    return PrivateKey::random();
+}
 
-pub fn encrypt(pk: PublicKey, id: ID, m: String) -> String {}
+pub fn encrypt(pk: PublicKey, id: ID, m: String) -> String { return "".to_string(); }
 
-pub fn decrypt(pk: PublicKey, id: ID, d: String, c: String) -> String {}
+pub fn decrypt(pk: PublicKey, id: ID, d: String, c: String) -> String { return "".to_string(); }
 
-pub fn validateCt(pk: PublicKey, id: i32, c: String) -> bool {}
+pub fn validateCt(pk: PublicKey, id: i32, c: String) -> bool { return true; }
 
 
 //convert *numbers* from the shamir.rs representation {modulus:BigNumber,value:BigNumber}
 //to a field element {value:BigNum}
 //maybe should go through to_bytes() --> from_bytes()
-pub fn pol_to_field_elem(pol_elem: PolyElement) -> field_element {
-    return pol_elem.value;
+pub fn pol_to_field_elem(pol_elem: &Element) -> FieldElement {
+    return FieldElement::from(pol_elem.value);
 }
 
 
