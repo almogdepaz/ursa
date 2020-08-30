@@ -20,6 +20,12 @@ use amcl_wrapper::{
     types_g2::GroupG2_SIZE,
 };
 
+//Do we need this or is it already part of amcl_wrapper (which the following is copied form)?
+use crate::constants::{
+    //BarrettRedc_k, BarrettRedc_u, BarrettRedc_v, BigNumBits, FieldElement_SIZE, NLEN,
+    CurveOrder
+};
+
 pub struct ID(pub Vec<u8>);
 impl_bytearray!(ID);
 
@@ -79,8 +85,9 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, VerificationKey, Vec::<ShareKey>) {
     //don't know if we want this to be a map (x,pol(x))
     let mut pol_eval = Vec::with_capacity(n as usize);
     for x in 1..n {
-        let y = polynomial.evaluate(x)?;
-        let y_val = pol_to_field_elem(y);
+        //let y = polynomial.evaluate(x)?;
+        let y = poly_eval(x)?;
+        //let y_val = pol_to_field_elem(y);
         pol_eval.push(y_val)
     }
 
@@ -135,6 +142,18 @@ pub fn validateCt(pk: PublicKey, id: i32, c: String) -> bool {}
 pub fn pol_to_field_elem(pol_elem: PolyElement) -> field_element {
     return pol_elem.value;
 }
+
+// pub??
+pub fn poly_eval(x: PolyElement) -> field_element {
+
+    let elem = PolyElement {
+        modulus: CurveOrder,
+        value: x,
+    };
+    let y = polynomial.evaluate(x)?;
+    return y.value;
+}
+
 
 
 
