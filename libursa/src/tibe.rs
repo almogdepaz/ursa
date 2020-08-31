@@ -13,6 +13,8 @@ use amcl_wrapper::{
 };
 use amcl_wrapper::constants::CurveOrder;
 use amcl_wrapper::field_elem::FieldElement;
+use amcl_wrapper::types::BigNum;
+use num_traits::FromPrimitive;
 use rand::Rng;
 use zeroize::Zeroize;
 
@@ -69,41 +71,40 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
     let a = Element {
         modulus: p,
-        value: BigNumber::from_u32(alpha).unwrap(), //convert to BigNumber
+        value: BigNumber::from_u32(usize::from_u32(alpha)).unwrap(), //convert to BigNumber
     };
     let polynomial = Polynomial::new(&a, (k - 1) as usize).unwrap();
 
 
     //compute polynomial evaluations 1..n
-    let mut pol_eval = Vec::with_capacity(n as usize);
+    let mut pol_eval: Vec<BigNumber> = Vec::with_capacity(n as usize);
     for x in 1..n {
         //todo figure out the correct style for using unwrap
         let t = BigNumber::from_u32(rng.gen()).unwrap();
-        //let y = polynomial.evaluate(x)?;
-        let y = polynomial.evaluate(&Element { modulus: CurveOrder.clone(), value: x })?;
+        let y = polynomial.evaluate(&Element { modulus: &CurveOrder, value: t }).unwrap();
         pol_eval.push(y.value)
     }
 
 
     //compute master key share
-    let mut sk = Vec::with_capacity(n as usize);
+    let mut sk: Vec<Share> = Vec::with_capacity(n as usize);
     for j in 1..n {
         //for j in 0..n-1 {   ???
         //let identifier = j + 1;
         let b = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
         sk.push(Share {
             j,
-            value: g2.clone().scalar_mul_const_time(&pol_to_field_elem(b)),
+            value: scalar_mul_const_timeg2(g2.clone(), &b as Big),
         });
     }
 
     //compute verification key
-    let mut vk = Vec::with_capacity(n as usize);
+    let mut vk: Vec<G1> = Vec::with_capacity(n as usize);
     for j in 1..n {
         //for j in 0..n-1 {   ???
         let b = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
         //todo need to test that the value exists
-        vk.push(g.clone().scalar_mul_const_time(&pol_to_field_elem(b)));
+        vk.push(scalar_mul_const_timeg1(g.clone(), &b as Big));
     }
 
     let pk = PublicKey { g, g1, g2, h1 };
@@ -126,12 +127,10 @@ pub fn decrypt(pk: PublicKey, id: ID, d: String, c: String) -> String { return "
 pub fn validateCt(pk: PublicKey, id: i32, c: String) -> bool { return true; }
 
 
-//convert *numbers* from the shamir.rs representation {modulus:BigNumber,value:BigNumber}
-//to a field element {value:BigNum}
-//maybe should go through to_bytes() --> from_bytes()
-pub fn pol_to_field_elem(pol_elem: &Element) -> FieldElement {
-    return FieldElement::from(pol_elem.value);
+fn scalar_mul_const_timeg1(g: Box<GroupElement>, a: &BigNum) -> Box<GroupElement> {
+    return g.mul(&a);
 }
+
 
 
 
