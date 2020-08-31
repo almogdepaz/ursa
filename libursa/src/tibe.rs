@@ -20,9 +20,6 @@ use bn::BigNumber;
 use sharing::shamir::{Element, Polynomial};
 use signatures::bls::PrivateKey;
 
-//Do we need this or is it already part of amcl_wrapper (which the following is copied form)?
-
-
 pub struct ID(pub Vec<u8>);
 impl_bytearray!(ID);
 
@@ -78,10 +75,8 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
 
     //compute polynomial evaluations 1..n
-    //don't know if we want this to be a map (x,pol(x))
     let mut pol_eval = Vec::with_capacity(n as usize);
     for x in 1..n {
-        //what is this??
         //todo figure out the correct style for using unwrap
         let t = BigNumber::from_u32(rng.gen()).unwrap();
         //let y = polynomial.evaluate(x)?;
@@ -91,7 +86,6 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
 
     //compute master key share
-
     let mut sk = Vec::with_capacity(n as usize);
     for j in 1..n {
         //for j in 0..n-1 {   ???
