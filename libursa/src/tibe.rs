@@ -11,6 +11,7 @@ use amcl_wrapper::{
     group_elem_g1::G1,
     group_elem_g2::G2,
 };
+use amcl_wrapper::constants::CurveOrder;
 use amcl_wrapper::field_elem::FieldElement;
 use rand::Rng;
 use zeroize::Zeroize;
@@ -20,9 +21,7 @@ use sharing::shamir::{Element, Polynomial};
 use signatures::bls::PrivateKey;
 
 //Do we need this or is it already part of amcl_wrapper (which the following is copied form)?
-use crate::amcl_wrapper::constants::{
-    CurveOrder
-};
+
 
 pub struct ID(pub Vec<u8>);
 impl_bytearray!(ID);
@@ -86,9 +85,8 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
         //todo figure out the correct style for using unwrap
         let t = BigNumber::from_u32(rng.gen()).unwrap();
         //let y = polynomial.evaluate(x)?;
-        let y = poly_eval(x)?;
-        //let y_val = pol_to_field_elem(y);
-        pol_eval.push(y_val)
+        let y = polynomial.evaluate(&Element { modulus: CurveOrder.clone(), value: x })?;
+        pol_eval.push(y.value)
     }
 
 
@@ -141,14 +139,7 @@ pub fn pol_to_field_elem(pol_elem: &Element) -> FieldElement {
     return FieldElement::from(pol_elem.value);
 }
 
-fn poly_eval(x: PolyElement) -> field_element {
-    let elem = PolyElement {
-        modulus: CurveOrder,
-        value: x,
-    };
-    let y = polynomial.evaluate(x)?;
-    return y.value;
-}
+
 
 
 
