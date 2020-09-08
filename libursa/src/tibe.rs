@@ -13,8 +13,6 @@ use amcl_wrapper::{
 };
 use amcl_wrapper::constants::CurveOrder;
 use amcl_wrapper::field_elem::FieldElement;
-use amcl_wrapper::types::BigNum;
-use num_traits::FromPrimitive;
 use rand::Rng;
 use zeroize::Zeroize;
 
@@ -59,7 +57,10 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     let g = G1::generator();
     let g2 = G2::generator();
     let h1 = G2::generator();
-    let p = &CurveOrder;
+
+    //convert from amcl::Big to BigNumber using hex (should find a better way)
+    let p: BigNumber = BigNumber::from_hex(&CurveOrder.tostring()).unwrap();
+
     let alpha: FieldElement = FieldElement::random();
 
     let g1 = g.scalar_mul_const_time(&alpha);
@@ -68,7 +69,8 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
     let a = Element {
         modulus: p,
-        value: alpha.to_bignum(), //convert to BigNumber
+        //convert from amcl::Big to BigNumber using hex (should find a better way)
+        value: BigNumber::from_hex(&alpha.to_bignum().tostring()).unwrap(),
     };
 
 
@@ -90,11 +92,12 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     for j in 1..n {
         //for j in 0..n-1 {   ???
         //let identifier = j + 1;
-        let b = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
+        let b: &BigNumber = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
+
         sk.push(Share {
             j,
-            value: scalar_mul_const_timeg2(g2.clone(), &b as Big),
-        });
+            value: g2.clone().scalar_mul_variable_time(&FieldElement::from_hex(BigNumber::to_hex(b).unwrap()).unwrap()),
+        })
     }
 
     //compute verification key
