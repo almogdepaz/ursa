@@ -59,7 +59,7 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     let h1 = G2::generator();
 
     //convert from amcl::Big to BigNumber using hex (should find a better way)
-    let p: BigNumber = BigNumber::from_hex(&CurveOrder.tostring()).unwrap();
+    let p = &CurveOrder;
 
     let alpha: FieldElement = FieldElement::random();
 
@@ -68,7 +68,7 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     //init with a as f(0)
 
     let a = Element {
-        modulus: p,
+        modulus: BigNumber::from_hex(&p.tostring()).unwrap(),
         //convert from amcl::Big to BigNumber using hex (should find a better way)
         value: BigNumber::from_hex(&alpha.to_bignum().tostring()).unwrap(),
     };
@@ -79,10 +79,10 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
     //compute polynomial evaluations 1..n
     let mut pol_eval: Vec<BigNumber> = Vec::with_capacity(n as usize);
-    for x in 1..n {
+    for _x in 1..n {
         //todo figure out the correct style for using unwrap
-        let t = BigNumber::from_u32(rng.gen()).unwrap();
-        let y = polynomial.evaluate(&Element { modulus: p, value: t }).unwrap();
+        let el = Element { modulus: BigNumber::from_hex(&p.tostring()).unwrap(), value: BigNumber::from_u32(rng.gen()).unwrap() };
+        let y = polynomial.evaluate(&el).unwrap();
         pol_eval.push(y.value)
     }
 
@@ -104,9 +104,9 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     let mut vk: Vec<G1> = Vec::with_capacity(n as usize);
     for j in 1..n {
         //for j in 0..n-1 {   ???
-        let b = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
+        let b: &BigNumber = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
         //todo need to test that the value exists
-        vk.push(g.clone().scalar_mul_variable_time(&FieldElement::from(&b)));
+        vk.push(g.clone().scalar_mul_variable_time(&FieldElement::from_hex(BigNumber::to_hex(b).unwrap()).unwrap()))
     }
 
     let pk = PublicKey { g, g1, g2, h1 };
