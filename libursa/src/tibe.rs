@@ -59,20 +59,19 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     let g = G1::generator();
     let g2 = G2::generator();
     let h1 = G2::generator();
-    let p = BigNumber::generate_prime(128).unwrap();
-    let alpha: u32 = rng.gen();
+    let p = &CurveOrder;
+    let alpha: FieldElement = FieldElement::random();
 
-
-    // compute  g1 = g * alpha;
-    let scalar = &FieldElement::from(alpha);
-    let g1 = g.scalar_mul_const_time(scalar);
+    let g1 = g.scalar_mul_const_time(&alpha);
     //calc polynomial variables
     //init with a as f(0)
 
     let a = Element {
         modulus: p,
-        value: BigNumber::from_u32(usize::from_u32(alpha)).unwrap(), //convert to BigNumber
+        value: alpha.to_bignum(), //convert to BigNumber
     };
+
+
     let polynomial = Polynomial::new(&a, (k - 1) as usize).unwrap();
 
 
@@ -81,7 +80,7 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     for x in 1..n {
         //todo figure out the correct style for using unwrap
         let t = BigNumber::from_u32(rng.gen()).unwrap();
-        let y = polynomial.evaluate(&Element { modulus: &CurveOrder, value: t }).unwrap();
+        let y = polynomial.evaluate(&Element { modulus: p, value: t }).unwrap();
         pol_eval.push(y.value)
     }
 
@@ -104,7 +103,7 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
         //for j in 0..n-1 {   ???
         let b = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
         //todo need to test that the value exists
-        vk.push(scalar_mul_const_timeg1(g.clone(), &b as Big));
+        vk.push(g.clone().scalar_mul_variable_time(&FieldElement::from(&b)));
     }
 
     let pk = PublicKey { g, g1, g2, h1 };
@@ -127,9 +126,7 @@ pub fn decrypt(pk: PublicKey, id: ID, d: String, c: String) -> String { return "
 pub fn validateCt(pk: PublicKey, id: i32, c: String) -> bool { return true; }
 
 
-fn scalar_mul_const_timeg1(g: Box<GroupElement>, a: &BigNum) -> Box<GroupElement> {
-    return g.mul(&a);
-}
+
 
 
 
