@@ -13,7 +13,7 @@ use amcl_wrapper::{
 };
 use amcl_wrapper::constants::CurveOrder;
 use amcl_wrapper::field_elem::FieldElement;
-use rand::Rng;
+use rand::{Rng, thread_rng};
 use zeroize::Zeroize;
 
 use bn::BigNumber;
@@ -46,42 +46,37 @@ pub struct PublicKey {
 // n = #parties ; k = threshold
 pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
 
-    //assert k<=n? both greater than 0?
-    if n < k {
+    //assert k<=n
+    //assert k > 0 and n > 0
+    if k <= n && n > 0 {
         panic!("bad input") //todo error handling
     }
 
-    //random number generator
-    let mut rng = rand::thread_rng();
 
-    let g = G1::generator();
-    let g2 = G2::generator();
-    let h1 = G2::generator();
+    let g: G1 = G1::generator();
+    let g2: G2 = G2::generator();
+    let h1: G2 = G2::generator();
 
-    //convert from amcl::Big to BigNumber using hex (should find a better way)
-    let p = &CurveOrder;
 
     let alpha: FieldElement = FieldElement::random();
+    let g1: G1 = g.scalar_mul_const_time(&alpha);
 
-    let g1 = g.scalar_mul_const_time(&alpha);
-    //calc polynomial variables
-    //init with a as f(0)
-
-    let a = Element {
-        modulus: BigNumber::from_hex(&p.tostring()).unwrap(),
-        //convert from amcl::Big to BigNumber using hex (should find a better way)
+    let a: Element = Element {
+        //p
+        modulus: BigNumber::from_hex(&CurveOrder.tostring()).unwrap(),
+        //alpha
         value: BigNumber::from_hex(&alpha.to_bignum().tostring()).unwrap(),
     };
 
 
-    let polynomial = Polynomial::new(&a, (k - 1) as usize).unwrap();
-
-
+    //random number generator
+    let mut rng = thread_rng();
     //compute polynomial evaluations 1..n
     let mut pol_eval: Vec<BigNumber> = Vec::with_capacity(n as usize);
+    let polynomial = Polynomial::new(&a, (k - 1) as usize).unwrap();
     for _x in 1..n {
         //todo figure out the correct style for using unwrap
-        let el = Element { modulus: BigNumber::from_hex(&p.tostring()).unwrap(), value: BigNumber::from_u32(rng.gen()).unwrap() };
+        let el = Element { modulus: a.modulus.try_clone().unwrap(), value: BigNumber::from_u32(rng.gen()).unwrap() };
         let y = polynomial.evaluate(&el).unwrap();
         pol_eval.push(y.value)
     }
@@ -90,8 +85,6 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     //compute master key share
     let mut sk: Vec<Share> = Vec::with_capacity(n as usize);
     for j in 1..n {
-        //for j in 0..n-1 {   ???
-        //let identifier = j + 1;
         let b: &BigNumber = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
 
         sk.push(Share {
@@ -103,13 +96,12 @@ pub fn setup(n: i32, k: i32) -> (PublicKey, Vec::<G1>, Vec::<Share>) {
     //compute verification key
     let mut vk: Vec<G1> = Vec::with_capacity(n as usize);
     for j in 1..n {
-        //for j in 0..n-1 {   ???
         let b: &BigNumber = pol_eval.get(usize::try_from(j).unwrap()).unwrap();
         //todo need to test that the value exists
         vk.push(g.clone().scalar_mul_variable_time(&FieldElement::from_hex(BigNumber::to_hex(b).unwrap()).unwrap()))
     }
 
-    let pk = PublicKey { g, g1, g2, h1 };
+    let pk: PublicKey = PublicKey { g, g1, g2, h1 };
     return (pk, vk, sk);
 }
 
